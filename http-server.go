@@ -1,0 +1,88 @@
+package main
+
+import (
+	"database/sql"
+	_ "embed"
+	"fmt"
+	"io"
+	"net/http"
+
+	"github.com/alexedwards/argon2id"
+	"github.com/valyala/fastjson"
+)
+
+var db *sql.DB
+
+type Session struct {
+	Token  string
+	UserID int
+}
+
+//go:embed assets/userLookup.sql
+var userLookupQuery string
+
+func gateRequest(methodType string, writer http.ResponseWriter, request *http.Request) bool {
+	if request.Method != methodType {
+		writer.WriteHeader(http.StatusMethodNotAllowed)
+		return false
+	}
+	return true
+}
+
+func httpMethods(srcdb *sql.DB) {
+	db = srcdb // Now methods can use db variable w/o connecting to sqlite again themselves
+	tokens := make(map[Session]struct{})
+
+	http.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
+		gateRequest("GET", w, r)
+		fmt.Fprint(w, "1.0.0_alpha")
+	})
+
+	http.HandleFunc("/api/login", func(w http.ResponseWriter, r *http.Request) {
+		gateRequest("POST", w, r)
+		if r.ContentLength >= 1024 {
+			// No way, absolutely not
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "{\"success\": false, \"error\":\"Body FAR too long!\"}")
+			return
+		}
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			death("readAll", err)
+		}
+		bodyJSON, err := fastjson.ParseBytes(bodyBytes)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "{\"success\": false, \"error\":\"JSON was invalid!\"}")
+		}
+		if !(bodyJSON.Exists("username") && bodyJSON.Exists("password")) {
+			w.WriteHeader(http.StatusBadRequest)
+			fmt.Fprint(w, "{\"success\": false, \"error\":\"JSON didn't match schema!\"}")
+		}
+		username := bodyJSON.GetStringBytes("username")
+		usernameStr := string(username)
+		password := bodyJSON.GetStringBytes("password")
+		passwordStr := string(password)
+		var userID int
+		var passwordHash string
+		err = db.QueryRow(userLookupQuery, usernameStr).Scan(&userID, &passwordHash)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				w.WriteHeader(http.StatusUnauthorized)
+				fmt.Fprint(w, "{\"success\": false, \"error\":\"Incorrect username or password!\"}")
+			}
+			death("queryRow", err)
+		}
+		match, err := argon2id.ComparePasswordAndHash(passwordStr, passwordHash)
+		if err != nil {
+			death("verifyHash", err)
+		}
+		if !match { // (yes i know there's a timing attack here where someone can try a bunch of usernames and the one that takes longer obviously did the KDF, but MEH.)
+			// Reject the user
+			w.WriteHeader(http.StatusUnauthorized)
+			fmt.Fprint(w, "{\"success\": false, \"error\":\"Incorrect username or password!\"}")
+		}
+		// Happy path
+		tokens[]
+	})
+}
