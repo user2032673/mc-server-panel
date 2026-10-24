@@ -1,8 +1,7 @@
 CREATE TABLE IF NOT EXISTS users (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	id INTEGER PRIMARY KEY AUTOINCREMENT CHECK (id >= 0), -- So as not to accidentally have a UID of -1, triggering sentinel values.
 	username TEXT UNIQUE NOT NULL,
 	password_hash TEXT NOT NULL,
-	permissions INTEGER NOT NULL,
 );
 
 CREATE TABLE IF NOT EXISTS servers (

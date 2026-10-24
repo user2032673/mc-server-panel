@@ -13,11 +13,9 @@ func isFile(path string) bool {
 	if err != nil {
 		return false // Some other error (e.g., permission denied)
 	}
-
-	// Returns true if it exists and is a regular file (not a directory)
-	return !info.IsDir()
+	return !info.IsDir() // make sure it's not say a directory called app.db, which would die on .read().
 }
 
-func death(msg string, err error) {
+func cooked(msg string, err error) {
 	log.Fatalf("%s: %s\n", msg, err)
 }

@@ -21,11 +21,11 @@ func firstRunSetup() *sql.DB {
 	log.Println("First run setup . . .")
 	db, err := sql.Open("sqlite", "app.db")
 	if err != nil {
-		death("dbOpen", err)
+		cooked("dbOpen", err)
 	}
 	_, err = db.Exec(firstRunSQL)
 	if err != nil {
-		death("dbSetup", err)
+		cooked("dbSetup", err)
 	}
 	return db
 }
@@ -34,29 +34,30 @@ func main() {
 	log.Println("Minecraft Server Panel v1.0 starting . . .")
 	client, err := incus.ConnectIncusUnix("", nil)
 	if err != nil {
-		death("connect", err)
+		cooked("connect", err)
 	}
 	serverInfo, _, err := client.GetServer()
 	if err != nil {
-		death("getServer", err)
+		cooked("getServer", err)
 	}
 	if serverInfo.APIVersion != "1.0" {
 		log.Fatalln("Wrong Incus server API version, refusing to connect for now!")
 	}
 	if !isFile("app.db") {
-		//db := firstRunSetup()
+		db := firstRunSetup()
 		firstRunSetup()
 	} else {
-		_, err := sql.Open("sqlite", "app.db")
+		db, err := sql.Open("sqlite", "app.db")
 		if err != nil {
-			death("dbOpen", err)
+			cooked("dbOpen", err)
 		}
 	}
 	// http is a global object here so the function doesn't lose track of it
-	httpMethods(db) // should be called setupHttpMethods
+	ramDB := loadRAMDB(db)
+	httpMethods(ramDB, db) // should be called setupHttpMethods
 	log.Printf("Binding to %s . . . \n", strings.TrimSpace(bindAddress))
 	err = http.ListenAndServe(strings.TrimSpace(bindAddress), nil)
 	if err != nil {
-		death("listenAndServe", err)
+		cooked("listenAndServe", err)
 	}
 }
