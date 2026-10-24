@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"uuid"
 
 	"github.com/alexedwards/argon2id"
 	"github.com/valyala/fastjson"
@@ -14,12 +15,25 @@ import (
 var db *sql.DB
 
 type Session struct {
-	Token  string
-	UserID int
+	UserID   int
+	Token    string
+	Username string
 }
 
 //go:embed assets/userLookup.sql
 var userLookupQuery string
+
+func generateToken(username string, tokens map[string]Session) {
+	token := uuid.NewV4().String()
+	
+
+	tokens[token] = Session{
+		UserID:   0,
+		Username: username,
+		Token:    token,
+	}
+
+}
 
 func gateRequest(methodType string, writer http.ResponseWriter, request *http.Request) bool {
 	if request.Method != methodType {
@@ -83,6 +97,6 @@ func httpMethods(srcdb *sql.DB) {
 			fmt.Fprint(w, "{\"success\": false, \"error\":\"Incorrect username or password!\"}")
 		}
 		// Happy path
-		tokens[]
+		generateToken(usernameStr)
 	})
 }
