@@ -1,4 +1,4 @@
-package main
+//package main
 
 import (
 	"database/sql"
@@ -25,7 +25,6 @@ var userLookupQuery string
 
 func generateToken(username string, tokens map[string]Session) {
 	token := uuid.NewV4().String()
-	
 
 	tokens[token] = Session{
 		UserID:   0,

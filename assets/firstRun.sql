@@ -12,4 +12,10 @@ CREATE TABLE IF NOT EXISTS servers (
     disk_limit_mb INTEGER NOT NULL,
     cpu_limit_percentage INTEGER NOT NULL CHECK (cpu_limit_percentage >= 0),
     ram_limit_mb INTEGER NOT NULL CHECK (ram_limit_mb >= 0)
-)
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id STRING PRIMARY KEY,
+    userID INTEGER CHECK (userID >= 0), -- Idk how to use FOREIGN KEY but it's meant to point to the users table's userID
+
+);

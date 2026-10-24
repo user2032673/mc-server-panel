@@ -22,10 +22,6 @@ func methodLock(methodType string, writer http.ResponseWriter, request *http.Req
 	return true
 }
 
-func createSession(userID int, db *sql.DB) {
-
-}
-
 func httpMethods(database *sql.DB) {
 
 	http.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
@@ -58,10 +54,15 @@ func httpMethods(database *sql.DB) {
 			cooked("verifyHash", err)
 		}
 		if match {
-			// Happy path :)
+			session := createSession(user, database)
+			w.Write([]byte(`{"success": true, "token": "`))
+			w.Write([]byte(session.SessionID))
+			w.Write([]byte(`"}`))
+			return
 
 		} else {
-			// Bad path :O
+			http.Error(w, `{"success": false, "reason": "Username or password incorrect"}`, http.StatusUnauthorized)
+			return
 		}
 
 	})

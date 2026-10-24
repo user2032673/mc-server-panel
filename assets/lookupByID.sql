@@ -1,1 +1,1 @@
-SELECT (username, password_hash) FROM users WHERE id = ?
+SELECT (username, password_hash) FROM users WHERE id = ?;
