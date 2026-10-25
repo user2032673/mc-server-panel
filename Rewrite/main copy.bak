@@ -1,0 +1,118 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	incus "github.com/lxc/incus/client"
+	"github.com/lxc/incus/shared/api"
+)
+
+type ServerCreationRequest struct {
+	name     string
+	maxRAM   uint
+	maxCPU   uint
+	maxDisk  uint
+	maxProcs uint
+}
+
+func die(source string, err error) {
+	log.Fatalf("%s: %s\n", source, err.Error())
+}
+
+func methodLock(w http.ResponseWriter, r *http.Request, method string) bool {
+	if r.Method != method {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+	}
+	return r.Method == method
+}
+
+func main() {
+	client, err := incus.ConnectIncusUnix("", nil)
+	if err != nil {
+		die("connectIncus", err)
+	}
+	req := api.InstancesPost{
+		Name: "my-test-container",
+		Type: api.InstanceTypeContainer, // Use api.InstanceTypeVirtualMachine for a VM
+		Source: api.InstanceSource{
+			Type:     "image",
+			Alias:    "ubuntu/26.04", // Change to your desired image alias or fingerprint
+			Server:   "https://images.linuxcontainers.org",
+			Protocol: "simplestreams",
+		},
+		Config: map[string]string{
+			"limits.cpu.allowance": "200ms/100ms",
+		},
+	}
+	op, err := client.CreateInstance(req)
+	if err != nil {
+		die("createInstance", err)
+	}
+	err = op.Wait()
+	if err != nil {
+		die("createInstanceWait", err)
+	}
+	log.Println("suckcess")
+	stateReq := api.InstanceStatePut{
+		Action:  "start",
+		Timeout: -1, // -1 means wait indefinitely for it to start
+	}
+	op, err = client.UpdateInstanceState("my-test-container", stateReq, "")
+	if err != nil {
+		die("Failed to start instance", err)
+	}
+
+	err = op.Wait()
+	if err != nil {
+		die("Start operation failed", err)
+	}
+	log.Println("suckcess")
+	time.Sleep(4 * time.Second)
+	stopReq := api.InstanceStatePut{
+		Timeout: 30,
+		Action:  "stop",
+	}
+	op, err = client.UpdateInstanceState("my-test-container", stopReq, "")
+	if err != nil {
+		die("updateInstanceStateDel", err)
+	}
+	err = op.Wait()
+	log.Println("suckcess")
+	if err != nil {
+		die("instanceStateWaitDel", err)
+	}
+	op, err = client.DeleteInstance("my-test-container")
+	if err != nil {
+		die("deleteInstance", err)
+	}
+	err = op.Wait()
+	if err != nil {
+		die("deleteInstanceWait", err)
+	}
+	log.Println("suckcess")
+	return
+
+	http.HandleFunc("/api/version", func(w http.ResponseWriter, r *http.Request) {
+		if !methodLock(w, r, "GET") {
+			return
+		}
+		fmt.Fprint(w, "1.0.0_alpha")
+	})
+	http.HandleFunc("/api/createServer", func(w http.ResponseWriter, r *http.Request) {
+		if !methodLock(w, r, "POST") {
+			return
+		}
+		var req ServerCreationRequest
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		err := decoder.Decode(&req)
+		if err != nil {
+			http.Error(w, `{"success": false, "reason": "invalid or malformed JSON"}`, http.StatusBadRequest)
+			return
+		}
+	})
+}
