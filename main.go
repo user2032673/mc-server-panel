@@ -31,6 +31,7 @@ func firstRunSetup() *sql.DB {
 }
 
 func main() {
+	var db *sql.DB
 	log.Println("Minecraft Server Panel v1.0 starting . . .")
 	client, err := incus.ConnectIncusUnix("", nil)
 	if err != nil {
@@ -44,17 +45,16 @@ func main() {
 		log.Fatalln("Wrong Incus server API version, refusing to connect for now!")
 	}
 	if !isFile("app.db") {
-		db := firstRunSetup()
+		db = firstRunSetup()
 		firstRunSetup()
 	} else {
-		db, err := sql.Open("sqlite", "app.db")
+		db, err = sql.Open("sqlite", "app.db")
 		if err != nil {
 			cooked("dbOpen", err)
 		}
 	}
 	// http is a global object here so the function doesn't lose track of it
-	ramDB := loadRAMDB(db)
-	httpMethods(ramDB, db) // should be called setupHttpMethods
+	httpMethods(db) // should be called setupHttpMethods
 	log.Printf("Binding to %s . . . \n", strings.TrimSpace(bindAddress))
 	err = http.ListenAndServe(strings.TrimSpace(bindAddress), nil)
 	if err != nil {
